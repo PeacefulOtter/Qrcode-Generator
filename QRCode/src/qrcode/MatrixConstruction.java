@@ -1,5 +1,6 @@
 package qrcode;
 
+import javax.sound.midi.SysexMessage;
 import java.io.ByteArrayInputStream;
 import java.util.Arrays;
 
@@ -7,11 +8,11 @@ public class MatrixConstruction {
 
 	/*
 	 * Constants defining the color in ARGB format
-	 * 
+	 *
 	 * W = White integer for ARGB
-	 * 
+	 *
 	 * B = Black integer for ARGB
-	 * 
+	 *
 	 * both needs to have their alpha component to 255
 	 */
 	private final static int WHITE_COLOR = 0xFF_FF_FF_FF;
@@ -21,7 +22,7 @@ public class MatrixConstruction {
 
 	/**
 	 * Create the matrix of a QR code with the given data.
-	 * 
+	 *
 	 * @param version
 	 *            The version of the QR code
 	 * @param data
@@ -32,11 +33,12 @@ public class MatrixConstruction {
 	 * @return The matrix of the QR code
 	 */
 	public static int[][] renderQRCodeMatrix(int version, boolean[] data, int mask) {
-
 		/*
 		 * PART 2
 		 */
 		int[][] matrix = constructMatrix(version, mask);
+
+		findBestMasking(version, data);
 		/*
 		 * PART 3
 		 */
@@ -47,15 +49,15 @@ public class MatrixConstruction {
 
 	/*
 	 * =======================================================================
-	 * 
+	 *
 	 * ****************************** PART 2 *********************************
-	 * 
+	 *
 	 * =======================================================================
 	 */
 
 	/**
 	 * Create a matrix (2D array) ready to accept data for a given version and mask
-	 * 
+	 *
 	 * @param version
 	 *            the version number of QR code (has to be between 1 and 4 included)
 	 * @param mask
@@ -79,22 +81,31 @@ public class MatrixConstruction {
 	/**
 	 * Create an empty 2d array of integers of the size needed for a QR code of the
 	 * given version
-	 * 
+	 *
 	 * @param version
 	 *            the version number of the qr code (has to be between 1 and 4
 	 *            included
 	 * @return an empty matrix
 	 */
-	public static int[][] initializeMatrix(int version) {
+	public static int[][] initializeMatrix( int version ) {
 		// get the matrix size thanks to the QRCodeInfos class
 		int matrixSize = QRCodeInfos.getMatrixSize( version );
+		int[][] initMatrix = new int[ matrixSize ][ matrixSize ];
+		// fill the matrix with zeros
+		for ( int i = 0; i < matrixSize; i++ )
+		{
+			for ( int j = 0; j < matrixSize; j++ )
+			{
+				initMatrix[ i ][ j ] = 0x00_00_00_00;
+			}
+		}
 		// return an empty 2D array -> our matrix
-		return new int[ matrixSize ][ matrixSize ];
+		return initMatrix;
 	}
 
 	/**
 	 * Add all finder patterns to the given matrix with a border of White modules.
-	 * 
+	 *
 	 * @param matrix
 	 *            the 2D array to modify: where to add the patterns
 	 */
@@ -154,14 +165,14 @@ public class MatrixConstruction {
 
 	/**
 	 * Add the alignment pattern if needed, does nothing for version 1
-	 * 
+	 *
 	 * @param matrix
 	 *            The 2D array to modify
 	 * @param version
 	 *            the version number of the QR code needs to be between 1 and 4
 	 *            included
 	 */
-	public static void addAlignmentPatterns(int[][] matrix, int version) {
+	public static void addAlignmentPatterns( int[][] matrix, int version ) {
 		// make sure the version is > 1, if it is not, then we just don't need the alignment pattern
 		if ( version <= 1 ) return;
 		int matrixSize = matrix.length;
@@ -188,11 +199,11 @@ public class MatrixConstruction {
 
 	/**
 	 * Add the timings patterns
-	 * 
+	 *
 	 * @param matrix
 	 *            The 2D array to modify
 	 */
-	public static void addTimingPatterns(int[][] matrix) {
+	public static void addTimingPatterns( int[][] matrix ) {
 		int padding = 8; // finder patterns are 8x8
 		// we draw the two timing pattern lines at the same time !
 		for ( int i = padding; i < matrix.length - padding; i++ )
@@ -206,7 +217,7 @@ public class MatrixConstruction {
 
 	/**
 	 * Add the dark module to the matrix
-	 * 
+	 *
 	 * @param matrix
 	 *            the 2-dimensional array representing the QR code
 	 */
@@ -216,7 +227,7 @@ public class MatrixConstruction {
 
 	/**
 	 * Add the format information to the matrix
-	 * 
+	 *
 	 * @param matrix
 	 *            the 2-dimensional array representing the QR code to modify
 	 * @param mask
@@ -261,7 +272,7 @@ public class MatrixConstruction {
 
 	/**
 	 * Choose the color to use with the given coordinate using the masking 0
-	 * 
+	 *
 	 * @param col
 	 *            x-coordinate
 	 * @param row
@@ -304,17 +315,17 @@ public class MatrixConstruction {
 				mask = ( ( ( col * row ) % 2 ) + ( ( col * row ) % 3 ) ) % 2 == 0;
 				break;
 			case 7:
-				mask = ( ( ( col + row ) % 2 ) + ( ( col + row ) % 3 ) ) % 2 == 0;
+				mask = ( ( ( col + row ) % 2 ) + ( ( col * row ) % 3 ) ) % 2 == 0;
 				break;
 		}
-		if ( mask ) dataBit =! dataBit;
+		if ( mask ) { dataBit =! dataBit; }
 		// return the correct color
 		return dataBit ? BLACK_COLOR : WHITE_COLOR;
 	}
 
 	/**
 	 * Add the data bits into the QR code matrix
-	 * 
+	 *
 	 * @param matrix
 	 *            a 2-dimensionnal array where the bits needs to be added
 	 * @param data
@@ -322,8 +333,6 @@ public class MatrixConstruction {
 	 */
 	public static void addDataInformation(int[][] matrix, boolean[] data, int mask) {
 		int matrixSize = matrix.length;
-
-		// ( dataIndex < data.length ? data[ dataIndex ] : false )
 
 		// the index we are looking for in the data array
 		int dataIndex = 0;
@@ -342,24 +351,18 @@ public class MatrixConstruction {
 			else if ( !goingUp ) { row = 0; maxRow = matrixSize; dirRow = 1; }
 
 			int col = pillarCol * 2;
+
 			// if we encounter the vertical timing pattern we need to shift the columns by -1
-
-
-
-
-
-
-
 			if ( pillarCol <= 3 && pillarCol > 0 ) { col--; }
 
-			// replace the for loop by a while because something the row variable can either increase or decrease
+			// replace the for loop by a while because the row variable can either increase or decrease
 			while ( row != maxRow )
 			{
 				// if the module has not been drawn, then we can apply the data
 				if ( matrix[ col ][ row ] == 0 )
 				{
 					// draw the matrix at (col; row)
-					drawMatrix( matrix, col, row, dataIndex, data, mask );
+					drawModule( matrix, col, row, dataIndex, data, mask );
 					dataIndex++;
 				}
 
@@ -367,7 +370,7 @@ public class MatrixConstruction {
 				if ( col > 0 && matrix[ col-1 ][ row ] == 0 )
 				{
 					// draw the matrix at (col-1; row)
-					drawMatrix( matrix, col-1, row, dataIndex, data, mask );
+					drawModule( matrix, col-1, row, dataIndex, data, mask );
 					dataIndex++;
 				}
 				// increase or decrease the row depending on whether we're going up or down
@@ -379,31 +382,31 @@ public class MatrixConstruction {
 	}
 
 
-	private static void drawMatrix( int[][] matrix,
+	private static void drawModule( int[][] matrix,
 									int col, int row,
 									int dataIndex, boolean[] d,
 									int mask )
 	{
 		// check if the dataIndex is inferior to the data length
 		// if it is not, set the dataBit to false
-		boolean dataBit = dataIndex < d.length && d[ dataIndex ];
+		boolean dataBit = dataIndex < d.length ? d[ dataIndex ] : false;
 		// and get the color the module needs to be depending on the dataBit value and the mask
 		matrix[ col ][ row ] = maskColor( col, row, dataBit, mask );
 	}
 
 	/*
 	 * =======================================================================
-	 * 
+	 *
 	 * ****************************** BONUS **********************************
-	 * 
+	 *
 	 * =======================================================================
 	 */
 
 	/**
 	 * Create the matrix of a QR code with the given data.
-	 * 
+	 *
 	 * The mask is computed automatically so that it provides the least penalty
-	 * 
+	 *
 	 * @param version
 	 *            The version of the QR code
 	 * @param data
@@ -420,26 +423,170 @@ public class MatrixConstruction {
 	/**
 	 * Find the best mask to apply to a QRcode so that the penalty score is
 	 * minimized. Compute the penalty score with evaluate
-	 * 
+	 *
 	 * @param data
 	 * @return the mask number that minimize the penalty
 	 */
 	public static int findBestMasking(int version, boolean[] data) {
-		// TODO BONUS
-		return 0;
+		int[][] maskedMatrix;
+
+		int bestPenalty = 0; // the lower the better
+		int maskPenalty = 0;
+		int bestMask = 0;
+		// check penalty for each mask
+		for ( int mask = 0; mask <= 7; mask++ )
+		{
+			// create and fill the matrix with the corresponding mask
+			maskedMatrix = constructMatrix( version, mask );
+			addDataInformation( maskedMatrix, data, mask );
+			Helpers.show(maskedMatrix, 20);
+
+			// and then calculate the penalty
+			System.out.print( "Checking for mask : " + mask + "  -> " );
+			maskPenalty = evaluate( maskedMatrix );
+			if ( bestPenalty >= maskPenalty )
+			{
+				bestPenalty = maskPenalty;
+				bestMask = mask;
+			}
+		}
+		return bestMask;
 	}
 
 	/**
 	 * Compute the penalty score of a matrix
-	 * 
+	 *
 	 * @param matrix:
 	 *            the QR code in matrix form
 	 * @return the penalty score obtained by the QR code, lower the better
+	 * 			with a precise mask
 	 */
-	public static int evaluate(int[][] matrix) {
-		//TODO BONUS
-	
-		return 0;
+	public static int evaluate( int[][] matrix ) {
+		int matrixSize = matrix.length;
+
+		int[] fPatLeft = {
+				WHITE_COLOR, WHITE_COLOR, WHITE_COLOR, WHITE_COLOR, BLACK_COLOR,
+				WHITE_COLOR, BLACK_COLOR, BLACK_COLOR, BLACK_COLOR, WHITE_COLOR,
+				BLACK_COLOR };
+		int[] fPatRight = {
+				BLACK_COLOR, WHITE_COLOR, BLACK_COLOR, BLACK_COLOR, BLACK_COLOR,
+				WHITE_COLOR, BLACK_COLOR, WHITE_COLOR, WHITE_COLOR, WHITE_COLOR,
+				WHITE_COLOR };
+		int patIndexX = 0;
+		int patIndexY = 0;
+
+		int penalty = 0;
+		int penaltyX = 0;
+		int penaltyY = 0;
+
+		int lastModuleX = 0;
+		int lastModuleY = 0;
+
+		// go through the matrix
+		for ( int col = 0; col < matrixSize; col++ )
+		{
+			for ( int row = 0; row < matrixSize; row++ )
+			{
+				int moduleX = matrix[ row ][ col ];
+				int moduleY = matrix[ col ][ row ];
+
+				// BoxP
+				if (
+						row < matrixSize - 1 &&
+						col < matrixSize - 1 &&
+						moduleX == matrix[ row+1 ][ col ] &&
+						moduleX == matrix[ row ][ col+1 ] &&
+						moduleX == matrix[ row+1 ][ col+1 ]
+				)
+				{
+					penalty *= 3;
+				}
+				if ( row == 0 )
+				{
+					lastModuleX = moduleX;
+					lastModuleY = moduleY;
+					continue;
+				}
+
+				// RunP
+				if ( moduleX == lastModuleX ) { penaltyX++; }
+				else { penaltyX = 0; }
+				if ( moduleY == lastModuleY ) { penaltyY++; }
+				else { penaltyY = 0; }
+
+				if ( penaltyX == 4 )
+				{
+					penalty += 3;
+				}
+				else if ( penaltyX > 4 )
+				{
+					penalty++;
+				}
+				if ( penaltyY == 4 )
+				{
+					penalty += 3;
+				}
+				else if ( penaltyY > 4 )
+				{
+					penalty++;
+				}
+
+				// Search for the finder sequences (FindP)
+				// we don't care if we follow the first or second pattern, we just want to know that we are actually following one
+				if ( moduleX == fPatLeft[ patIndexX ] || moduleX == fPatRight[ patIndexX ] )
+				{
+					patIndexX++;
+				}
+				if ( moduleY == fPatLeft[ patIndexY ] || moduleY == fPatRight[ patIndexY ] )
+				{
+					patIndexY++;
+				}
+
+
+				lastModuleX = moduleX;
+				lastModuleY = moduleY;
+			}
+		}
+		System.out.println( penalty );
+		return penalty;
 	}
 
+	private static int checkSurroundedModules( int[][] matrix, int matrixSize,
+											   int col, int row )
+	{
+		int penalty = 0;
+		int potentialRow = 0;
+		int potentialCol = 0;
+
+		int rowIndex, colIndex;
+
+		for ( int padding = -2; padding <= 2; padding++ )
+		{
+			rowIndex = row + padding;
+			colIndex = col + padding;
+
+			if ( rowIndex > 0 || rowIndex < matrixSize )
+			{
+				// we get the matrix at the padded index and turn it into a boolean
+				boolean matrixValueRow = matrix[ col ][ rowIndex ] == 1;
+				// then get the color with the corresponding matrix value and mask
+				// compare the color values
+			}
+
+			if ( colIndex > 0 || colIndex < matrixSize )
+			{
+				// we get the matrix at the padded index and turn it into a boolean
+				boolean matrixValueCol = matrix[ colIndex ][ row ] == 1;
+				// then get the color with the corresponding matrix value and mask
+				// turn the color into an integer depending on the color
+			}
+		}
+
+		if ( potentialCol == 5 ) { penalty += 3; }
+		if ( potentialRow == 5 ) { penalty += 3; }
+
+		return penalty;
+	}
 }
+
+

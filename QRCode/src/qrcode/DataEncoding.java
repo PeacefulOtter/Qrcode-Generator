@@ -16,6 +16,7 @@ public final class DataEncoding {
 		/* QRCode Params */
 		// get the maximum array length depending on the version
 		int maxInputLength = QRCodeInfos.getMaxInputLength( version );
+		int maxCodeWordsLength = QRCodeInfos.getCodeWordsLength( version );
 		int eccLength = QRCodeInfos.getECCLength( version );
 
 		// Convert message to integer sequence of given max length using ISO-8859-1
@@ -25,7 +26,7 @@ public final class DataEncoding {
 		// Add padding bytes (236 and 17) to the data until the size of the given array match the given length
 		if ( encodedInput.length < maxInputLength )
 		{
-			encodedInput = fillSequence( encodedInput, maxInputLength );
+			encodedInput = fillSequence( encodedInput, maxCodeWordsLength );
 		}
 		// Add the error correction code to the encodedData
 		encodedInput = addErrorCorrection( encodedInput, eccLength );
@@ -93,7 +94,7 @@ public final class DataEncoding {
 
 		// Prefix the message with the 4-bit encoding information of byte mode: 0100 -> 0b0100 that we shift to the left 4 times => 0100_0000
 		// And add the four firsts bit to encode the length of the message 0000
-		infoInputArray[ 0 ] = (byte) (  ( 0b0100 << 4 )  |  ( bytesLength & 0xF ) );
+		infoInputArray[ 0 ] = (byte) (  ( 0b0100 << 4 )  |  ( bytesLength >> 4 ) );
 
 		// Add the last 4 bits to encode the length of the message 1110_ + the four first bits of the inputBytes
 		infoInputArray[ 1 ] = (byte) (  ( (byte) ( bytesLength << 4 ) )  |  (byte) ( inputBytes[ 0 ] >> 4 )  );
@@ -124,8 +125,11 @@ public final class DataEncoding {
 		boolean swap = true;
 		for ( int i = 0; i < finalLength; i++ ) {
 			int dummy = 0;
+			// encodedData at index i is defined
 			if ( i < encodedData.length ) {
 				 dummy = encodedData[ i ];
+			// the index i is bigger than the encodedData array length
+			// so we fill the array with 236 and 17
 			} else {
 				if ( swap ) { dummy = 236; }
 				else if ( !swap ) { dummy = 17; }
@@ -179,10 +183,11 @@ public final class DataEncoding {
 				//      and get the most right bit after the shifting
 				//      since we actually want a boolean value we use the (bit == 1)
 				// 		trick, and get a boolean
-				//      we finally store the boolean boolean value at the
+				//      we finally store the boolean value at the
 				//      (i*8)+j index of boolArray in order to cover the whole array length
-				// this line is amazing, take a deep breath and read it
-				boolArray[ ( i * 8 ) + j ] = ( ( b >> ( 7 - j ) & 0x01 ) == 1);
+				int index = ( i * 8 ) + j;
+				int shifting = ( b >> ( 7 - j ) ) & 0x01;
+				boolArray[ index ] = shifting == 1;
 			}
 		}
 		return boolArray;

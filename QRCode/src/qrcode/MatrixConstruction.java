@@ -442,7 +442,7 @@ public class MatrixConstruction {
 			Helpers.show(maskedMatrix, 20);
 
 			// and then calculate the penalty
-			System.out.print( "Checking for mask : " + mask + "  -> " );
+			System.out.println( "Checking for mask : " + mask );
 			maskPenalty = evaluate( maskedMatrix );
 			if ( bestPenalty >= maskPenalty )
 			{
@@ -451,6 +451,7 @@ public class MatrixConstruction {
 			}
 		}
 		return bestMask;
+
 	}
 
 	/**
@@ -472,12 +473,17 @@ public class MatrixConstruction {
 				BLACK_COLOR, WHITE_COLOR, BLACK_COLOR, BLACK_COLOR, BLACK_COLOR,
 				WHITE_COLOR, BLACK_COLOR, WHITE_COLOR, WHITE_COLOR, WHITE_COLOR,
 				WHITE_COLOR };
-		int patIndexX = 0;
-		int patIndexY = 0;
+		int patLeftIndexX = 0;
+		int patLeftIndexY = 0;
+		int patRightIndexX = 0;
+		int patRightIndexY = 0;
+		int patPenalty = 0;
+
+		int boxPenalty = 0;
 
 		int penalty = 0;
-		int penaltyX = 0;
-		int penaltyY = 0;
+		int penaltyX = 1;
+		int penaltyY = 1;
 
 		int lastModuleX = 0;
 		int lastModuleY = 0;
@@ -499,8 +505,11 @@ public class MatrixConstruction {
 						moduleX == matrix[ row+1 ][ col+1 ]
 				)
 				{
-					penalty *= 3;
+					boxPenalty += 3;
 				}
+
+				// if row is 0 then the last Modules are not defined
+				// row = 0 means we are at the beginning of a line and a column
 				if ( row == 0 )
 				{
 					lastModuleX = moduleX;
@@ -510,44 +519,77 @@ public class MatrixConstruction {
 
 				// RunP
 				if ( moduleX == lastModuleX ) { penaltyX++; }
-				else { penaltyX = 0; }
+				else { penaltyX = 1; }
 				if ( moduleY == lastModuleY ) { penaltyY++; }
-				else { penaltyY = 0; }
+				else { penaltyY = 1; }
 
-				if ( penaltyX == 4 )
+				if ( penaltyX == 5 )
 				{
 					penalty += 3;
 				}
-				else if ( penaltyX > 4 )
+				else if ( penaltyX > 5 )
 				{
 					penalty++;
 				}
-				if ( penaltyY == 4 )
+				if ( penaltyY == 5 )
 				{
 					penalty += 3;
 				}
-				else if ( penaltyY > 4 )
+				else if ( penaltyY > 5 )
 				{
 					penalty++;
 				}
 
 				// Search for the finder sequences (FindP)
 				// we don't care if we follow the first or second pattern, we just want to know that we are actually following one
-				if ( moduleX == fPatLeft[ patIndexX ] || moduleX == fPatRight[ patIndexX ] )
+				if ( moduleX == fPatLeft[ patLeftIndexX ] )
 				{
-					patIndexX++;
+					patLeftIndexX++;
+					if ( patLeftIndexX == fPatLeft.length )
+					{
+						patPenalty += 40;
+						patLeftIndexX = 0;
+					}
 				}
-				if ( moduleY == fPatLeft[ patIndexY ] || moduleY == fPatRight[ patIndexY ] )
+				else { patLeftIndexX = 0; }
+				if ( moduleX == fPatRight[ patRightIndexX ] )
 				{
-					patIndexY++;
+					patRightIndexX++;
+					if ( patRightIndexX == fPatRight.length )
+					{
+						patPenalty += 40;
+						patRightIndexX = 0;
+					}
 				}
-
+				else { patRightIndexX = 0; }
+				if ( moduleY == fPatLeft[ patLeftIndexY ] )
+				{
+					patLeftIndexY++;
+					if ( patLeftIndexY == fPatLeft.length )
+					{
+						patPenalty += 40;
+						patLeftIndexY = 0;
+					}
+				}
+				else { patLeftIndexY = 0; }
+				if ( moduleY == fPatRight[ patRightIndexY ] )
+				{
+					patRightIndexY++;
+					if ( patRightIndexY == fPatRight.length )
+					{
+						patPenalty += 40;
+						patRightIndexY = 0;
+					}
+				}
+				else { patRightIndexY = 0; }
 
 				lastModuleX = moduleX;
 				lastModuleY = moduleY;
 			}
 		}
-		System.out.println( penalty );
+		System.out.println( "RunP : " + penalty );
+		System.out.println( "BoxP : " + boxPenalty );
+		System.out.println( "FindP : " + patPenalty );
 		return penalty;
 	}
 

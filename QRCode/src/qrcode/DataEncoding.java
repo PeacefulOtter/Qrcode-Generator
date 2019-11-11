@@ -128,9 +128,9 @@ public final class DataEncoding {
 			// encodedData at index i is defined
 			if ( i < encodedData.length ) {
 				 dummy = encodedData[ i ];
-			// the index i is bigger than the encodedData array length
-			// so we fill the array with 236 and 17
 			} else {
+				// the index i is bigger than the encodedData array length
+				// so we fill the array with 236 and 17
 				if ( swap ) { dummy = 236; }
 				else if ( !swap ) { dummy = 17; }
 				swap = !swap;
@@ -150,8 +150,11 @@ public final class DataEncoding {
 	 * @return the original data concatenated with the error correction
 	 */
 	public static int[] addErrorCorrection(int[] encodedData, int eccLength) {
+		// add the ecc length to the matrix length
 		int arrayLength = encodedData.length + eccLength;
+		// create a new array with the length we just got
 		int[] errorCorrectionArray = new int[ arrayLength ];
+		// get the error correction array we need to add at the end of the matrix
 		int[] errorData = ErrorCorrectionEncoding.encode( encodedData, eccLength );
 		for ( int i = 0; i < arrayLength; i++ ) {
 			if ( i < encodedData.length ) {

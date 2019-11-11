@@ -17,8 +17,8 @@ public class MatrixConstruction {
 	 */
 	private final static int WHITE_COLOR = 0xFF_FF_FF_FF;
 	private final static int BLACK_COLOR = 0xFF_00_00_00;
-	private final static int RED_COLOR   = 0xAA_AA_22_55;
-	private final static int GREEN_COLOR = 0xAA_AA_CC_AA;
+	private final static int RED_COLOR   = 0x55_AA_22_55;
+	private final static int GREEN_COLOR = 0x55_AA_CC_AA;
 
 	/**
 	 * Create the matrix of a QR code with the given data.
@@ -37,8 +37,6 @@ public class MatrixConstruction {
 		 * PART 2
 		 */
 		int[][] matrix = constructMatrix(version, mask);
-
-		findBestMasking(version, data);
 		/*
 		 * PART 3
 		 */
@@ -430,28 +428,62 @@ public class MatrixConstruction {
 	public static int findBestMasking(int version, boolean[] data) {
 		int[][] maskedMatrix;
 
-		int bestPenalty = 0; // the lower the better
-		int maskPenalty = 0;
-		int bestMask = 0;
-		// check penalty for each mask
+		int bestPenalty = 9999; // save the mask with the lowest penalty value
+		int maskPenalty; // the actual mask penalty
+		int bestMask = 0; // the best mask number
+
+		// check the penalty for each mask
 		for ( int mask = 0; mask <= 7; mask++ )
 		{
 			// create and fill the matrix with the corresponding mask
 			maskedMatrix = constructMatrix( version, mask );
 			addDataInformation( maskedMatrix, data, mask );
-			Helpers.show(maskedMatrix, 20);
-
 			// and then calculate the penalty
 			System.out.println( "Checking for mask : " + mask );
 			maskPenalty = evaluate( maskedMatrix );
+			// save the best mask
 			if ( bestPenalty >= maskPenalty )
 			{
 				bestPenalty = maskPenalty;
 				bestMask = mask;
 			}
 		}
+		System.out.println( "Best : " + bestMask );
 		return bestMask;
+	}
 
+
+
+	public static int checkPatternSequence( int beginRow, int beginCol, int[][] matrix, int[][] sequences )
+	{
+		int penaltyMultiplier = 0;
+
+		int matrixSize = matrix.length;
+
+		for ( int[] sequence : sequences )
+		{
+			int penaltyX = 0;
+			int penaltyY = 0;
+
+			// checking rows and columns at the same time
+			for ( int i = 0; i < sequence.length; i++ )
+			{
+				// we found a pattern that matches the sequence
+				if ( beginRow+i < matrixSize && matrix[ beginRow+i ][ beginCol ] == sequence[ i ] )
+				{
+					penaltyX++;
+				}
+				if ( beginCol+i < matrixSize && matrix[ beginRow ][ beginCol+i ] == sequence[ i ] )
+				{
+					penaltyY++;
+				}
+			}
+			// if the penalty is equal to the sequence length, it means we found the exact sequence
+			if ( penaltyX == sequence.length ) { penaltyMultiplier++; }
+			if ( penaltyY == sequence.length ) { penaltyMultiplier++; }
+		}
+		// 40 times the number of sequences we found in the matrix
+		return 40 * penaltyMultiplier;
 	}
 
 	/**
@@ -462,9 +494,16 @@ public class MatrixConstruction {
 	 * @return the penalty score obtained by the QR code, lower the better
 	 * 			with a precise mask
 	 */
-	public static int evaluate( int[][] matrix ) {
+	public static int evaluate( int[][] matrix )
+	{
 		int matrixSize = matrix.length;
 
+		int finalPenalty;
+		int repetitivePenalty = 0;
+		int boxPenalty = 0;
+		int patternPenalty = 0;
+
+		// the two sequences we will try to find in the matrix
 		int[] fPatLeft = {
 				WHITE_COLOR, WHITE_COLOR, WHITE_COLOR, WHITE_COLOR, BLACK_COLOR,
 				WHITE_COLOR, BLACK_COLOR, BLACK_COLOR, BLACK_COLOR, WHITE_COLOR,
@@ -473,40 +512,45 @@ public class MatrixConstruction {
 				BLACK_COLOR, WHITE_COLOR, BLACK_COLOR, BLACK_COLOR, BLACK_COLOR,
 				WHITE_COLOR, BLACK_COLOR, WHITE_COLOR, WHITE_COLOR, WHITE_COLOR,
 				WHITE_COLOR };
-		int patLeftIndexX = 0;
-		int patLeftIndexY = 0;
-		int patRightIndexX = 0;
-		int patRightIndexY = 0;
-		int patPenalty = 0;
+		int[][] patternSequences = { fPatLeft, fPatRight };
 
-		int boxPenalty = 0;
-
-		int penalty = 0;
-		int penaltyX = 1;
-		int penaltyY = 1;
+		int nbTotalModules = matrixSize * matrixSize;
+		int nbBlackModules= 0;
+		int blackModRatio;
 
 		int lastModuleX = 0;
 		int lastModuleY = 0;
 
-		// go through the matrix
 		for ( int col = 0; col < matrixSize; col++ )
 		{
+			int tempPenaltyX = 1;
+			int tempPenaltyY = 1;
+
+			// checking the rows and columns at the same time
 			for ( int row = 0; row < matrixSize; row++ )
 			{
 				int moduleX = matrix[ row ][ col ];
 				int moduleY = matrix[ col ][ row ];
 
-				// BoxP
+				// BalP Part
+				if ( moduleX == BLACK_COLOR ) { nbBlackModules++; }
+
+				// used to avoid repetition
+				int[] modulesArr = { moduleX, moduleY, lastModuleX, lastModuleY, tempPenaltyX, tempPenaltyY };
+
+
+				// BoxP part
 				if (
 						row < matrixSize - 1 &&
 						col < matrixSize - 1 &&
-						moduleX == matrix[ row+1 ][ col ] &&
-						moduleX == matrix[ row ][ col+1 ] &&
-						moduleX == matrix[ row+1 ][ col+1 ]
+						moduleX == matrix[ row + 1 ][ col ] &&
+						moduleX == matrix[ row ][ col + 1 ] &&
+						moduleX == matrix[ row + 1 ][ col + 1 ]
 				)
 				{
 					boxPenalty += 3;
 				}
+
 
 				// if row is 0 then the last Modules are not defined
 				// row = 0 means we are at the beginning of a line and a column
@@ -517,117 +561,72 @@ public class MatrixConstruction {
 					continue;
 				}
 
-				// RunP
-				if ( moduleX == lastModuleX ) { penaltyX++; }
-				else { penaltyX = 1; }
-				if ( moduleY == lastModuleY ) { penaltyY++; }
-				else { penaltyY = 1; }
 
-				if ( penaltyX == 5 )
+				// RunP part ( i = 0 -> X,  i = 1 -> Y )
+				for ( int i = 0; i < 2; i++ )
 				{
-					penalty += 3;
-				}
-				else if ( penaltyX > 5 )
-				{
-					penalty++;
-				}
-				if ( penaltyY == 5 )
-				{
-					penalty += 3;
-				}
-				else if ( penaltyY > 5 )
-				{
-					penalty++;
+					int module = modulesArr[ i ];
+					int lastModule = modulesArr[ i + 2 ];
+					int tempPenalty = modulesArr[ i + 4 ];
+
+					// if the actual module is the same than the one before
+					// than we increase the temPenalty by 1
+					// However if it is not, we reset tempPenalty to one
+					// That way, if tempPenalty >= 5, it means that we found
+					// a linear run of size >= 5
+					if ( module == lastModule )
+					{
+						tempPenalty++;
+					} else
+					{
+						tempPenalty = 1;
+					}
+					if ( tempPenalty == 5 )
+					{
+						repetitivePenalty += 3;
+					} else if ( tempPenalty > 5 )
+					{
+						repetitivePenalty++;
+					}
+
+					if ( i == 0 )
+					{
+						tempPenaltyX = tempPenalty;
+					} else
+					{
+						tempPenaltyY = tempPenalty;
+					}
 				}
 
-				// Search for the finder sequences (FindP)
-				// we don't care if we follow the first or second pattern, we just want to know that we are actually following one
-				if ( moduleX == fPatLeft[ patLeftIndexX ] )
-				{
-					patLeftIndexX++;
-					if ( patLeftIndexX == fPatLeft.length )
-					{
-						patPenalty += 40;
-						patLeftIndexX = 0;
-					}
-				}
-				else { patLeftIndexX = 0; }
-				if ( moduleX == fPatRight[ patRightIndexX ] )
-				{
-					patRightIndexX++;
-					if ( patRightIndexX == fPatRight.length )
-					{
-						patPenalty += 40;
-						patRightIndexX = 0;
-					}
-				}
-				else { patRightIndexX = 0; }
-				if ( moduleY == fPatLeft[ patLeftIndexY ] )
-				{
-					patLeftIndexY++;
-					if ( patLeftIndexY == fPatLeft.length )
-					{
-						patPenalty += 40;
-						patLeftIndexY = 0;
-					}
-				}
-				else { patLeftIndexY = 0; }
-				if ( moduleY == fPatRight[ patRightIndexY ] )
-				{
-					patRightIndexY++;
-					if ( patRightIndexY == fPatRight.length )
-					{
-						patPenalty += 40;
-						patRightIndexY = 0;
-					}
-				}
-				else { patRightIndexY = 0; }
+
+				// FindP part
+				patternPenalty += checkPatternSequence( row, col, matrix, patternSequences );
+
 
 				lastModuleX = moduleX;
 				lastModuleY = moduleY;
 			}
 		}
-		System.out.println( "RunP : " + penalty );
-		System.out.println( "BoxP : " + boxPenalty );
-		System.out.println( "FindP : " + patPenalty );
-		return penalty;
-	}
 
-	private static int checkSurroundedModules( int[][] matrix, int matrixSize,
-											   int col, int row )
-	{
-		int penalty = 0;
-		int potentialRow = 0;
-		int potentialCol = 0;
-
-		int rowIndex, colIndex;
-
-		for ( int padding = -2; padding <= 2; padding++ )
+		// BalP Part
+		blackModRatio = nbBlackModules * 100 / nbTotalModules;
+		while ( blackModRatio % 5 != 0 )
 		{
-			rowIndex = row + padding;
-			colIndex = col + padding;
-
-			if ( rowIndex > 0 || rowIndex < matrixSize )
-			{
-				// we get the matrix at the padded index and turn it into a boolean
-				boolean matrixValueRow = matrix[ col ][ rowIndex ] == 1;
-				// then get the color with the corresponding matrix value and mask
-				// compare the color values
-			}
-
-			if ( colIndex > 0 || colIndex < matrixSize )
-			{
-				// we get the matrix at the padded index and turn it into a boolean
-				boolean matrixValueCol = matrix[ colIndex ][ row ] == 1;
-				// then get the color with the corresponding matrix value and mask
-				// turn the color into an integer depending on the color
-			}
+			blackModRatio--;
 		}
+		int[] slice = { Math.abs(blackModRatio - 50), Math.abs(blackModRatio + 5 - 50) };
+		int pickedPercentage = 2 * ( ( slice[ 0 ] < slice[ 1 ] ) ? slice[ 0 ] : slice[ 1 ] );
 
-		if ( potentialCol == 5 ) { penalty += 3; }
-		if ( potentialRow == 5 ) { penalty += 3; }
 
-		return penalty;
+		finalPenalty = repetitivePenalty + boxPenalty + patternPenalty + pickedPercentage;
+
+		System.out.println( "RunP : " + repetitivePenalty );
+		System.out.println( "BoxP : " + boxPenalty );
+		System.out.println( "FindP : " + patternPenalty );
+		System.out.println( "BalP : " + pickedPercentage );
+		System.out.println( " - FinalP : " + finalPenalty );
+		System.out.println( " " );
+		return finalPenalty;
 	}
 }
 
